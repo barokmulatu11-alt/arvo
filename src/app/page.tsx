@@ -3,9 +3,9 @@ import { ArrowRight } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="h-screen w-screen bg-white text-neutral-900 flex flex-col justify-between overflow-hidden animate-fade-in font-sans">
+    <div className="min-h-screen w-full bg-white text-neutral-900 flex flex-col justify-between animate-fade-in font-sans">
       {/* Header */}
-      <header className="h-14 border-b border-neutral-100 px-8 flex items-center justify-between shrink-0">
+      <header className="h-14 border-b border-neutral-100 px-4 md:px-8 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-bold text-sm tracking-tight text-neutral-900 uppercase">
             Arvo
@@ -29,13 +29,13 @@ export default function Home() {
       </header>
 
       {/* Main hero */}
-      <main className="flex-1 flex flex-col justify-center items-center px-6">
+      <main className="flex-1 flex flex-col justify-center items-center px-4 py-12 md:px-6">
         <div className="max-w-2xl text-center space-y-6">
           <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
             Enterprise Resume Builder
           </span>
 
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-neutral-900 leading-[1.1]">
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-neutral-900 leading-[1.1]">
             Build a job-winning resume with computational precision.
           </h1>
 
@@ -43,17 +43,17 @@ export default function Home() {
             An editorial, typography-first builder equipped with gap analysis and recruiter optimization pipelines. Built for professionals.
           </p>
 
-          <div className="flex items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <Link
               href="/signup"
-              className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-neutral-900 hover:bg-black px-6 py-3 rounded-[6px] transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-neutral-900 hover:bg-black px-6 py-3 rounded-[6px] transition-colors"
             >
               Create Resume Free
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <Link
               href="/login"
-              className="inline-flex items-center justify-center text-xs font-bold text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 px-6 py-3 rounded-[6px] transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center text-xs font-bold text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 px-6 py-3 rounded-[6px] transition-colors"
             >
               Dashboard
             </Link>
@@ -63,7 +63,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-6 border-t border-neutral-100 shrink-0 bg-white">
-        <div className="max-w-7xl mx-auto px-8 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between">
           <span className="font-bold text-xs text-neutral-900 uppercase">Arvo</span>
           <p className="text-[10px] text-neutral-400 font-medium">
             &copy; 2026 Arvo. Barok Labs
