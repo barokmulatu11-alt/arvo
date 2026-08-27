@@ -1669,7 +1669,7 @@ export default function ResumeEditor() {
                   key={pageIdx}
                   className={`relative ${paperSize === "a4" ? "page-a4" : "page-letter"} ${
                     margins === "narrow" ? "margin-narrow" : margins === "wide" ? "margin-wide" : "margin-standard"
-                  } ${activeTemplate.container} flex flex-col shrink-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-border overflow-hidden bg-background`}
+                  } ${activeTemplate.container} flex flex-col shrink-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-border overflow-hidden bg-[#F5F3EC] text-neutral-900`}
                 >
                   <div className="flex-1 flex flex-col gap-4 overflow-hidden">
                     {pageItems.map((item, itemIdx) => renderPageItem(item, itemIdx))}
@@ -1687,7 +1687,7 @@ export default function ResumeEditor() {
               <div
                 className={`relative ${paperSize === "a4" ? "page-a4" : "page-letter"} ${
                   margins === "narrow" ? "margin-narrow" : margins === "wide" ? "margin-wide" : "margin-standard"
-                } ${activeTemplate.container} flex flex-col shrink-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-border overflow-hidden bg-background`}
+                } ${activeTemplate.container} flex flex-col shrink-0 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-border overflow-hidden bg-[#F5F3EC] text-neutral-900`}
               >
                 <div className="flex-1 flex flex-col gap-4">
                   {renderPageItem({ type: "header" }, "fallback-hdr")}
