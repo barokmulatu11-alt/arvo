@@ -905,9 +905,9 @@ export default function ResumeEditor() {
               >
                 {edu.institution || "Institution"}
               </span>
-              <span className="text-muted-foreground font-medium tabular-nums">{edu.graduationDate}</span>
+              <span className="text-neutral-500 font-medium tabular-nums">{edu.graduationDate}</span>
             </div>
-            <div className="text-muted-foreground italic">
+            <div className="text-neutral-500 italic">
               {edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ""}
             </div>
           </div>
@@ -956,13 +956,13 @@ export default function ResumeEditor() {
               >
                 {proj.name || "Project Name"}
               </span>
-              {proj.url && <span className="text-muted-foreground font-mono text-[10px]">{proj.url}</span>}
+              {proj.url && <span className="text-neutral-500 font-mono text-[10px]">{proj.url}</span>}
             </div>
             <p
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => handleInlineEdit("projects", item.index, "description", e.target.innerText)}
-              className="text-muted-foreground text-xs mt-1 leading-normal"
+              className="text-neutral-500 text-xs mt-1 leading-normal"
             >
               {proj.description || "Project description..."}
             </p>
@@ -979,11 +979,11 @@ export default function ResumeEditor() {
         const cert = content.certifications[item.index];
         if (!cert) return null;
         return (
-          <div key={key} className="flex justify-between text-xs text-foreground">
+          <div key={key} className="flex justify-between text-xs text-neutral-900">
             <div>
               <span className="font-bold">{cert.name}</span> — <span>{cert.issuer}</span>
             </div>
-            <span className="text-muted-foreground tabular-nums">{cert.date}</span>
+            <span className="text-neutral-500 tabular-nums">{cert.date}</span>
           </div>
         );
       default:
