@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
@@ -39,7 +39,9 @@ export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Drops & Modal states
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -106,13 +108,11 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const userRes = await fetch("/api/auth/me");
+      const userRes = await fetch("/api/user/profile");
       const userData = await userRes.json();
-      if (!userRes.ok || !userData.user) {
-        router.push("/login");
-        return;
+      if (userRes.ok && userData.user) {
+        setUser(userData.user);
       }
-      setUser(userData.user);
 
       const resumesRes = await fetch("/api/resumes");
       const resumesData = await resumesRes.json();
@@ -157,6 +157,49 @@ export default function DashboardPage() {
       toast(err.message || "Failed to create resume", "error");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      toast("Only PDF files are supported", "error");
+      return;
+    }
+
+    setIsImporting(true);
+    toast("Parsing PDF... this may take a moment", "success");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/ai/parse", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        if (data.limitReached) {
+          toast(data.error, "warning", 6000);
+          router.push("/dashboard/billing");
+        } else {
+          throw new Error(data.error || "Failed to parse PDF");
+        }
+        return;
+      }
+
+      toast("Resume imported successfully!", "success");
+      router.push(`/editor/${data.resumeId}`);
+    } catch (err: any) {
+      toast(err.message || "Failed to import resume", "error");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -325,14 +368,31 @@ export default function DashboardPage() {
             <p className="text-xs text-neutral-500 mt-2 font-medium">Here's what's happening with your resumes today.</p>
           </div>
 
-          <button
-            onClick={handleCreateResume}
-            disabled={isCreating}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-black px-4 py-2 rounded-[6px] transition-colors disabled:opacity-50"
-          >
-            {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-            Create New Resume
-          </button>
+          <div className="flex items-center gap-3">
+            <input 
+              type="file" 
+              accept=".pdf" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleImportPdf}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting || isCreating}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-[6px] transition-colors disabled:opacity-50"
+            >
+              {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 rotate-180" />}
+              Import PDF
+            </button>
+            <button
+              onClick={handleCreateResume}
+              disabled={isCreating || isImporting}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-neutral-900 hover:bg-black px-4 py-2 rounded-[6px] transition-colors disabled:opacity-50"
+            >
+              {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              Create New Resume
+            </button>
+          </div>
         </section>
 
         {/* Recent Resumes Grid */}

@@ -1,35 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { buildResumeHTML } from "@/lib/templateGenerator";
 
-// Path to Chrome/Edge already installed on the system — no Chromium download needed
-const CHROME_PATHS = [
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  process.env.LOCALAPPDATA + "\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-];
-
-function getChromePath(): string {
-  const fs = require("fs");
-  for (const p of CHROME_PATHS) {
-    if (p && fs.existsSync(p)) return p;
-  }
-  throw new Error(
-    "No Chrome or Edge installation found. Install Chrome and try again."
-  );
-}
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { templateId, content, margins, paperSize, title } = body;
+    const { templateId, content, margins, paperSize, title, fontSize } = body;
 
     if (!content) {
       return NextResponse.json(
@@ -38,79 +20,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const browserlessToken = process.env.BROWSERLESS_TOKEN;
+    if (!browserlessToken) {
+      console.error("[PDF_EXPORT] Missing BROWSERLESS_TOKEN in environment variables");
+      return NextResponse.json({ error: "Server configuration error: PDF generation token missing." }, { status: 500 });
+    }
+
     const htmlContent = buildResumeHTML(
       templateId || "minimal",
       content,
       margins || "normal",
-      paperSize || "a4"
+      paperSize || "a4",
+      fontSize || "standard"
     );
 
-    // Use puppeteer-core with the system Chrome — no ~170MB download
-    const puppeteer = await import("puppeteer-core");
+    // Call Browserless.io /pdf endpoint
+    const browserlessUrl = `https://chrome.browserless.io/pdf?token=${browserlessToken}`;
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 25000); // 25s timeout
 
-    const browser = await puppeteer.launch({
-      executablePath: getChromePath(),
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--font-render-hinting=none",
-      ],
+    let res: Response;
+    try {
+      res = await fetch(browserlessUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          html: htmlContent,
+          options: {
+            displayHeaderFooter: false,
+            printBackground: true,
+            format: paperSize === "a4" ? "A4" : "Letter",
+          },
+          gotoOptions: {
+            waitUntil: "networkidle0"
+          }
+        }),
+      });
+    } catch (fetchError: any) {
+      console.error("[PDF_EXPORT] Fetch to Browserless failed:", fetchError);
+      return NextResponse.json({ error: "Failed to connect to PDF generation service." }, { status: 500 });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Unable to read error text");
+      console.error(`[PDF_EXPORT] Browserless returned ${res.status}:`, errorText);
+      return NextResponse.json({ error: "PDF generation service reported an error. Please try again." }, { status: 500 });
+    }
+
+    const pdfBuffer = await res.arrayBuffer();
+    const sanitizedTitle = (title || "resume")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "-") // Replace any non-alphanumeric (and non-ascii) chars with dashes
+      .replace(/-+/g, "-")          // Collapse multiple dashes
+      .replace(/^-|-$/g, "");       // Trim leading/trailing dashes
+    const fileName = `${sanitizedTitle || "resume"}.pdf`;
+
+    return new NextResponse(pdfBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Length": String(pdfBuffer.byteLength),
+      },
     });
 
-    try {
-      const page = await browser.newPage();
-
-      // Set viewport to A4/Letter width so layout is correct
-      await page.setViewport({
-        width: paperSize === "a4" ? 794 : 816, // ~210mm or 215.9mm at 96dpi
-        height: paperSize === "a4" ? 1123 : 1056,
-        deviceScaleFactor: 2,
-      });
-
-      // Write the complete HTML document and wait for layout + fonts
-      await page.setContent(htmlContent, {
-        waitUntil: "load",
-        timeout: 30000,
-      });
-      // Extra delay to allow Google Fonts to fully render
-      await new Promise((r) => setTimeout(r, 1500));
-
-      // Generate PDF — printBackground preserves colors/borders
-      const pdfBuffer = await page.pdf({
-        format: paperSize === "a4" ? "A4" : "Letter",
-        printBackground: true,   // preserve background colors and borders
-        preferCSSPageSize: true, // honour @page size/margin from templateGenerator
-        displayHeaderFooter: false,
-      });
-
-      const fileName = `${(title || "resume")
-        .toLowerCase()
-        .replace(/\s+/g, "-")}.pdf`;
-
-      // Convert to Uint8Array so NextResponse accepts it as BodyInit
-      const pdfBytes = new Uint8Array(pdfBuffer as Buffer);
-
-      return new NextResponse(pdfBytes, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${fileName}"`,
-          "Content-Length": String(pdfBytes.length),
-        },
-      });
-    } finally {
-      await browser.close();
-    }
   } catch (error: any) {
-    console.error("PDF export error:", error);
+    console.error("[PDF_EXPORT] Unexpected error during PDF generation:", error);
     return NextResponse.json(
-      {
-        error:
-          "Failed to generate PDF: " + (error.message || "Unknown error"),
-      },
+      { error: "PDF generation failed due to a server issue. Please try again." },
       { status: 500 }
     );
   }

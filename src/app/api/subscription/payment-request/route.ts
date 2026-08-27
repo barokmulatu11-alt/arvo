@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 const ADMIN_EMAIL = "barok.m.lakew@gmail.com";
 const APP_NAME = "Arvo";
 
 export async function POST(req: NextRequest) {
-  const authUser = await getAuthUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { method, screenshotBase64, screenshotType, billingCycle } = await req.json();
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     // Cancel any previous PENDING request from this user
     await prisma.paymentRequest.updateMany({
-      where: { userId: authUser.userId, status: "PENDING" },
+      where: { userId: userId, status: "PENDING" },
       data: { status: "REJECTED", adminNote: "Superseded by new submission" },
     });
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     
     const request = await prisma.paymentRequest.create({
       data: {
-        userId: authUser.userId,
+        userId: userId,
         method,
         screenshotData: screenshotBase64,
         screenshotType: screenshotType || "image/jpeg",
@@ -46,14 +46,14 @@ export async function POST(req: NextRequest) {
       await resend.emails.send({
         from: `${APP_NAME} <onboarding@resend.dev>`,
         to: ADMIN_EMAIL,
-        subject: `New Payment Request — ${authUser.name} (${method})`,
+        subject: `New Payment Request — ${""} (${method})`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; color: #171717;">
             <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">New Payment Request</h2>
             <p style="font-size: 13px; color: #555; margin-bottom: 16px;">A user has submitted a manual payment for review.</p>
             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-              <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Name</td><td style="padding: 6px 0; font-weight: 700;">${authUser.name}</td></tr>
-              <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Email</td><td style="padding: 6px 0;">${authUser.email}</td></tr>
+              <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Name</td><td style="padding: 6px 0; font-weight: 700;">${""}</td></tr>
+              <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Email</td><td style="padding: 6px 0;">${""}</td></tr>
               <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Method</td><td style="padding: 6px 0; font-weight: 700;">${method}</td></tr>
               <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Amount</td><td style="padding: 6px 0;">ETB ${amount} (${billingCycle || "monthly"})</td></tr>
               <tr><td style="padding: 6px 0; color: #888; font-weight: 600;">Request ID</td><td style="padding: 6px 0; font-family: monospace;">${request.id}</td></tr>
@@ -75,12 +75,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const authUser = await getAuthUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const latest = await prisma.paymentRequest.findFirst({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
       orderBy: { createdAt: "desc" },
     });
 

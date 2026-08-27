@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 const ADMIN_EMAIL = "barok.m.lakew@gmail.com";
 
 // GET — all payment requests (admin only)
 export async function GET() {
-  const authUser = await getAuthUser();
-  if (!authUser || authUser.email !== ADMIN_EMAIL) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const requestingUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!requestingUser || requestingUser.email !== ADMIN_EMAIL) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
@@ -44,9 +47,12 @@ export async function GET() {
 
 // PUT — approve or reject a request (admin only)
 export async function PUT(req: NextRequest) {
-  const authUser = await getAuthUser();
-  if (!authUser || authUser.email !== ADMIN_EMAIL) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const requestingUser = await prisma.user.findUnique({ where: { id: userId } });
+  if (!requestingUser || requestingUser.email !== ADMIN_EMAIL) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {

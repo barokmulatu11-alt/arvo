@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 const DEFAULT_RESUME_CONTENT = {
@@ -22,13 +22,11 @@ const DEFAULT_RESUME_CONTENT = {
 // GET /api/resumes - List all resumes of the authenticated user
 export async function GET() {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const resumes = await prisma.resume.findMany({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
       orderBy: { updatedAt: "desc" },
     });
 
@@ -42,23 +40,35 @@ export async function GET() {
 // POST /api/resumes - Create a new resume
 export async function POST(request: Request) {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Check user subscription tier and limits
-    const user = await prisma.user.findUnique({
-      where: { id: authUser.userId },
+    let user = await prisma.user.findUnique({
+      where: { id: userId },
       include: { subscription: true },
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      const { clerkClient } = await import("@clerk/nextjs/server");
+      const clerk = await clerkClient();
+      const clerkUser = await clerk.users.getUser(userId);
+      
+      const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+      const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "New User";
+
+      user = await prisma.user.create({
+        data: {
+          id: userId,
+          email,
+          name,
+        },
+        include: { subscription: true }
+      });
     }
 
     const resumeCount = await prisma.resume.count({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
     });
 
     const isPro = user.subscription?.plan === "PRO";
@@ -78,7 +88,7 @@ export async function POST(request: Request) {
 
     const newResume = await prisma.resume.create({
       data: {
-        userId: authUser.userId,
+        userId: userId,
         title,
         templateId,
         content: JSON.stringify(DEFAULT_RESUME_CONTENT),

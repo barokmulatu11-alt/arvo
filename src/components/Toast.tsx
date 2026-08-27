@@ -54,31 +54,31 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none p-4">
         {toasts.map((t) => {
           let Icon = Info;
-          let bgColor = "bg-white border-neutral-200 text-neutral-900";
-          let iconColor = "text-neutral-500";
+          let bgColor = "bg-surface border-border text-foreground";
+          let iconColor = "text-muted";
 
           switch (t.type) {
             case "success":
               Icon = CheckCircle;
-              bgColor = "bg-white border-neutral-900 text-neutral-900";
-              iconColor = "text-neutral-900";
+              bgColor = "bg-surface border-accent text-foreground";
+              iconColor = "text-accent";
               break;
             case "error":
               Icon = AlertCircle;
-              bgColor = "bg-white border-neutral-200 text-neutral-900";
-              iconColor = "text-neutral-900 font-bold";
+              bgColor = "bg-surface border-border text-foreground";
+              iconColor = "text-red-500 font-bold";
               break;
             case "warning":
               Icon = AlertTriangle;
-              bgColor = "bg-white border-neutral-200 text-neutral-900";
-              iconColor = "text-neutral-600";
+              bgColor = "bg-surface border-border text-foreground";
+              iconColor = "text-yellow-500";
               break;
           }
 
           return (
             <div
               key={t.id}
-              className={`toast-enter flex items-center justify-between p-3.5 rounded-[6px] border shadow-sm ${bgColor} pointer-events-auto transition-all duration-200 w-full`}
+              className={`toast-enter flex items-center justify-between p-3.5 rounded-[var(--radius)] border shadow-sm ${bgColor} pointer-events-auto transition-all duration-200 w-full`}
               role="alert"
             >
               <div className="flex items-center gap-2.5">
@@ -87,7 +87,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               </div>
               <button
                 onClick={() => dismiss(t.id)}
-                className="ml-4 text-neutral-400 hover:text-neutral-900 transition-colors p-0.5 rounded-[4px] hover:bg-neutral-100"
+                className="ml-4 text-muted hover:text-foreground transition-colors p-0.5 rounded-[var(--radius-sm)] hover:bg-white/10"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

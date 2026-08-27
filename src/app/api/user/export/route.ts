@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const userData = await prisma.user.findUnique({
-      where: { id: authUser.userId },
+      where: { id: userId },
       include: {
         resumes: true,
         subscription: true,
@@ -46,7 +44,7 @@ export async function GET() {
     return new NextResponse(JSON.stringify(exportPayload, null, 2), {
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="arvo_export_${authUser.userId}.json"`,
+        "Content-Disposition": `attachment; filename="arvo_export_${userId}.json"`,
       },
     });
   } catch (error: any) {

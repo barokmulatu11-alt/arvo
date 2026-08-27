@@ -11,7 +11,7 @@ export function PasswordInput(props: PasswordInputProps) {
       <input
         {...props}
         type={showPassword ? 'text' : 'password'}
-        className={`block w-full px-3 py-2 pr-10 border border-neutral-200 rounded-[6px] text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 text-sm bg-white hover:bg-neutral-50/50 focus:bg-white ${props.className || ''}`}
+        className={`block w-full px-3 py-2 pr-10 border border-border rounded-[var(--radius)] text-foreground placeholder-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent text-sm bg-surface hover:brightness-110 focus:bg-background transition-smooth ${props.className || ''}`}
       />
       <button
         type="button"

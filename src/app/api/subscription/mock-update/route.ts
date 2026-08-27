@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 const ADMIN_EMAIL = "barok.m.lakew@gmail.com";
@@ -7,13 +7,12 @@ const ADMIN_EMAIL = "barok.m.lakew@gmail.com";
 // This route is admin-only. Regular users must submit a payment request instead.
 export async function POST(request: Request) {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Only the admin can directly update plans
-    if (authUser.email !== ADMIN_EMAIL) {
+    const requestingUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!requestingUser || requestingUser.email !== ADMIN_EMAIL) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -24,10 +23,10 @@ export async function POST(request: Request) {
     }
 
     await prisma.subscription.upsert({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
       update: { plan, status: "ACTIVE" },
       create: {
-        userId: authUser.userId,
+        userId: userId,
         plan,
         status: "ACTIVE",
         aiUsageCount: 0,

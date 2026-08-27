@@ -6,10 +6,12 @@
 // - All resume sections: Summary, Experience, Education, Skills, Projects, Certifications
 // - Full per-template typography for all 20 templates
 
-export const buildResumeHTML = (templateId: string, content: any, margins: string, paperSize: string) => {
+export const buildResumeHTML = (templateId: string, content: any, margins: string, paperSize: string, fontSize: string = "standard") => {
   const marginVal = margins === "narrow" ? "12mm" : margins === "wide" ? "28mm" : "18mm";
   const pageWidth = paperSize === "a4" ? "210mm" : "215.9mm";
   const pageHeight = paperSize === "a4" ? "297mm" : "279.4mm";
+  
+  const fontScale = fontSize === "small" ? 0.9 : fontSize === "large" ? 1.1 : 1.0;
 
   // Default style tokens
   let fontImport = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap";
@@ -310,14 +312,27 @@ export const buildResumeHTML = (templateId: string, content: any, margins: strin
   const esc = (str: string) =>
     (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+  const formatContactItem = (item: string | undefined, type: 'email' | 'url' | 'text') => {
+    if (!item) return null;
+    const escaped = esc(item);
+    if (type === 'email') {
+      return `<a href="mailto:${escaped}" style="color: inherit; text-decoration: none;">${escaped}</a>`;
+    }
+    if (type === 'url') {
+      const href = item.startsWith('http') ? escaped : `https://${escaped}`;
+      return `<a href="${href}" style="color: inherit; text-decoration: none;" target="_blank">${escaped}</a>`;
+    }
+    return `<span>${escaped}</span>`;
+  };
+
   const contactItems = [
-    content.personalInfo?.email,
-    content.personalInfo?.phone,
-    content.personalInfo?.location,
-    content.personalInfo?.website,
+    formatContactItem(content.personalInfo?.email, 'email'),
+    formatContactItem(content.personalInfo?.phone, 'text'),
+    formatContactItem(content.personalInfo?.location, 'text'),
+    formatContactItem(content.personalInfo?.website, 'url'),
+    formatContactItem(content.personalInfo?.linkedin, 'url'),
   ]
     .filter(Boolean)
-    .map((item) => `<span>${esc(item)}</span>`)
     .join(" &nbsp;&middot;&nbsp; ");
 
   let body = `
@@ -411,7 +426,7 @@ export const buildResumeHTML = (templateId: string, content: any, margins: strin
     body += `</div>`;
   }
 
-  return `<!DOCTYPE html>
+  let rawHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -446,4 +461,13 @@ export const buildResumeHTML = (templateId: string, content: any, margins: strin
   <div style="width: 100%;">${body}</div>
 </body>
 </html>`;
+
+  if (fontScale !== 1.0) {
+    return rawHtml.replace(/font-size:\s*([\d.]+)pt;/g, (match, p1) => {
+      const newSize = (parseFloat(p1) * fontScale).toFixed(1);
+      return `font-size: ${newSize}pt;`;
+    });
+  }
+
+  return rawHtml;
 };

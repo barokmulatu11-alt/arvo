@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useToast } from "@/components/Toast";
 import { TEMPLATES } from "@/lib/templates";
 import { buildResumeHTML as generatePdfHtml } from "@/lib/templateGenerator";
@@ -10,8 +11,9 @@ import {
   ArrowLeft, Loader2, User, Briefcase, GraduationCap, 
   Code, FolderGit, Award, Eye, FileText, ChevronUp, 
   ChevronDown, Plus, Trash2, Wand2, Compass, Printer,
-  Lock
+  Lock, Send, MessageSquare
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Types matching Schema
 interface PersonalInfo {
@@ -20,6 +22,7 @@ interface PersonalInfo {
   email: string;
   phone: string;
   website: string;
+  linkedin: string;
   location: string;
 }
 
@@ -78,13 +81,14 @@ export default function ResumeEditor() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useUser();
   const resumeId = params.id as string;
 
   // Editor states
   const [title, setTitle] = useState("Untitled Resume");
   const [templateId, setTemplateId] = useState("modern");
   const [content, setContent] = useState<ResumeContent>({
-    personalInfo: { firstName: "", lastName: "", email: "", phone: "", website: "", location: "" },
+    personalInfo: { firstName: "", lastName: "", email: "", phone: "", website: "", linkedin: "", location: "" },
     summary: "",
     experience: [],
     education: [],
@@ -105,15 +109,22 @@ export default function ResumeEditor() {
   const [aiResult, setAiResult] = useState("");
   const [previousContent, setPreviousContent] = useState<ResumeContent | null>(null);
 
+  // Conversational AI chat state
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   // Template select modal
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [skillsInputs, setSkillsInputs] = useState<Record<string, string>>({});
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  // Fetch subscription info for template lock checking
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/user/profile");
         const data = await res.json();
         if (res.ok && data.user) {
           setUserProfile(data.user);
@@ -125,11 +136,17 @@ export default function ResumeEditor() {
     fetchProfile();
   }, []);
 
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
   // Export configurations and state hooks
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<"pdf" | "docx">("pdf");
   const [paperSize, setPaperSize] = useState<"a4" | "letter">("a4");
   const [margins, setMargins] = useState<"narrow" | "standard" | "wide">("standard");
+  const [fontSize, setFontSize] = useState<"small" | "standard" | "large">("standard");
   const [includePageNumbers, setIncludePageNumbers] = useState(true);
   const [includeHyperlinks, setIncludeHyperlinks] = useState(true);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
@@ -152,23 +169,85 @@ export default function ResumeEditor() {
         setTitle(data.resume.title);
         setTemplateId(data.resume.templateId);
         
-        let parsedContent = data.resume.content;
-        if (typeof parsedContent === "string") {
-          parsedContent = JSON.parse(parsedContent);
+        let raw = data.resume.content;
+        if (typeof raw === "string") {
+          raw = JSON.parse(raw);
         }
-        
-        setContent({
-          personalInfo: parsedContent.personalInfo || { firstName: "", lastName: "", email: "", phone: "", website: "", location: "" },
-          summary: parsedContent.summary || "",
-          experience: parsedContent.experience || [],
-          education: parsedContent.education || [],
-          skills: parsedContent.skills || [],
-          projects: parsedContent.projects || [],
-          certifications: parsedContent.certifications || [],
-        });
-        const loadedSkills = parsedContent.skills || [];
+
+        // ── Defensive normalizer ──────────────────────────────────────────
+        // Handles both the editor's own schema AND old Gemini snake_case output.
+        const pi = raw?.personalInfo || raw?.personal_info || {};
+        const nameParts = ((pi.full_name || "") as string).trim().split(" ");
+        const normalised: ResumeContent = {
+          personalInfo: {
+            firstName: pi.firstName || nameParts[0] || "",
+            lastName:  pi.lastName  || nameParts.slice(1).join(" ") || "",
+            email:    pi.email    || "",
+            phone:    pi.phone    || "",
+            website:  pi.website  || pi.portfolio_url || "",
+            linkedin: pi.linkedin_url || "",
+            location: pi.location || "",
+          },
+          summary: raw?.summary || "",
+          experience: (raw?.experience || []).map((e: any) => ({
+            id:          e.id || Math.random().toString(36).substring(2, 9),
+            company:     e.company    || "",
+            position:    e.position   || e.job_title || "",
+            location:    e.location   || "",
+            startDate:   e.startDate  || e.start_date || "",
+            endDate:     e.endDate    || e.end_date   || "",
+            current:     e.current    ?? (e.end_date || e.endDate || "").toLowerCase() === "present",
+            description: typeof e.description === "string"
+              ? e.description
+              : Array.isArray(e.highlights) ? e.highlights.join("\n") : "",
+          })),
+          education: (raw?.education || []).map((e: any) => ({
+            id:             e.id || Math.random().toString(36).substring(2, 9),
+            institution:    e.institution   || "",
+            degree:         e.degree        || "",
+            fieldOfStudy:   e.fieldOfStudy  || e.field_of_study || "",
+            graduationDate: e.graduationDate || e.end_date || "",
+            description:    typeof e.description === "string"
+              ? e.description
+              : Array.isArray(e.details) ? e.details.join("\n") : "",
+          })),
+          // Skills: handle string[], {category,items}[], or old Gemini raw objects
+          skills: (() => {
+            const rawSkills = raw?.skills || [];
+            if (!rawSkills.length) return [];
+            if (typeof rawSkills[0] === "string") {
+              return [{ id: Math.random().toString(36).substring(2, 9), category: "Skills", items: rawSkills as string[] }];
+            }
+            return rawSkills.map((s: any) => ({
+              id:       s.id       || Math.random().toString(36).substring(2, 9),
+              category: s.category || s.name || "Skills",
+              items:    Array.isArray(s.items)  ? s.items
+                      : Array.isArray(s.skills) ? s.skills
+                      : [],
+            }));
+          })(),
+          projects: (raw?.projects || []).map((p: any) => ({
+            id:           p.id || Math.random().toString(36).substring(2, 9),
+            name:         p.name        || "",
+            description:  typeof p.description === "string"
+              ? p.description
+              : Array.isArray(p.highlights) ? p.highlights.join("\n") : "",
+            technologies: Array.isArray(p.technologies) ? p.technologies : [],
+            url:          p.url || p.link || "",
+          })),
+          certifications: (raw?.certifications || []).map((c: any) => ({
+            id:     c.id     || Math.random().toString(36).substring(2, 9),
+            name:   c.name   || "",
+            issuer: c.issuer || "",
+            date:   c.date   || "",
+          })),
+        };
+        // ─────────────────────────────────────────────────────────────────
+
+        setContent(normalised);
+
         const inputs: Record<string, string> = {};
-        loadedSkills.forEach((s: any) => {
+        normalised.skills.forEach((s) => {
           inputs[s.id] = s.items.join(", ");
         });
         setSkillsInputs(inputs);
@@ -185,6 +264,7 @@ export default function ResumeEditor() {
 
     fetchResume();
   }, [resumeId, router, toast]);
+
 
   // Debounced Autosave effect
   useEffect(() => {
@@ -488,6 +568,52 @@ export default function ResumeEditor() {
     }
   };
 
+  // Conversational AI chat handler
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const instruction = chatInput.trim();
+    setChatInput("");
+    setChatMessages(prev => [...prev, { role: "user", text: instruction }]);
+    setIsChatLoading(true);
+
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cvJson: content, instruction }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.limitReached) {
+          setChatMessages(prev => [...prev, { role: "assistant", text: "⚠️ AI limit reached. Upgrade to Pro for unlimited uses." }]);
+          router.push("/billing");
+        } else {
+          setChatMessages(prev => [...prev, { role: "assistant", text: `Error: ${data.error || "AI request failed."}` }]);
+        }
+        return;
+      }
+
+      // Apply updated CV to editor state
+      if (data.updatedCv) {
+        setPreviousContent(content);
+        setContent(prev => ({
+          ...prev,
+          ...data.updatedCv,
+        }));
+      }
+
+      setChatMessages(prev => [...prev, { role: "assistant", text: data.assistantMessage || "Done! Your resume has been updated." }]);
+      toast("Resume updated by AI", "success");
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: "assistant", text: "Something went wrong. Please try again." }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   const ghostRef = useRef<HTMLDivElement>(null);
 
   // Dynamic layout partition calculation
@@ -584,13 +710,18 @@ export default function ResumeEditor() {
             content,
             margins,
             paperSize,
+            fontSize,
             title,
           }),
         });
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Export failed");
+          const errMsg = err.error || "Export failed";
+          toast("PDF generation failed: " + errMsg, "error");
+          setShowExportModal(false);
+          setExportProgress("");
+          return;
         }
 
         // Stream the PDF blob and trigger a native download — no dialog
@@ -679,6 +810,16 @@ export default function ResumeEditor() {
                   className={activeTemplate.contactItem}
                 >
                   {content.personalInfo.website}
+                </span>
+              )}
+              {content.personalInfo.linkedin && (
+                <span
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => handleInlineEdit("personalInfo", 0, "linkedin", e.target.innerText)}
+                  className={activeTemplate.contactItem}
+                >
+                  {content.personalInfo.linkedin}
                 </span>
               )}
             </div>
@@ -1007,6 +1148,9 @@ export default function ResumeEditor() {
           >
             Export
           </button>
+          
+          <div className="w-px h-4 bg-neutral-200 mx-1"></div>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -1111,6 +1255,16 @@ export default function ResumeEditor() {
                     onChange={(e) => updatePersonalInfo("website", e.target.value)}
                     className="w-full mt-1 px-2.5 py-1.5 border border-neutral-200 rounded-[6px] text-xs focus:ring-1 focus:ring-neutral-900 bg-white"
                     placeholder="portfolio.com"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest">LinkedIn</label>
+                  <input
+                    type="text"
+                    value={content.personalInfo.linkedin}
+                    onChange={(e) => updatePersonalInfo("linkedin", e.target.value)}
+                    className="w-full mt-1 px-2.5 py-1.5 border border-neutral-200 rounded-[6px] text-xs focus:ring-1 focus:ring-neutral-900 bg-white"
+                    placeholder="linkedin.com/in/..."
                   />
                 </div>
               </div>
@@ -1500,7 +1654,7 @@ export default function ResumeEditor() {
           {/* Active Paginated Resume Preview */}
           <div 
             ref={previewContainerRef}
-            className="flex flex-col gap-8 items-center no-print py-4 origin-top transition-transform duration-150"
+            className="flex flex-col gap-8 items-center print-area-wrapper py-4 origin-top transition-transform duration-150"
             style={{
               transform: `scale(${zoomScale})`,
               width: paperSize === "a4" ? "210mm" : "215.9mm",
@@ -1630,6 +1784,66 @@ export default function ResumeEditor() {
                 <Compass className="w-3.5 h-3.5" />
                 Open Tailor Panel
               </Link>
+            </div>
+
+            {/* Conversational AI Chat */}
+            <div className="border-t border-neutral-100 pt-5 space-y-3">
+              <div className="flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-neutral-500" />
+                <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest">AI Chat Editor</label>
+              </div>
+
+              <div className="bg-neutral-50 border border-neutral-200 rounded-[6px] min-h-[120px] max-h-[240px] overflow-y-auto p-3 space-y-2">
+                {chatMessages.length === 0 && (
+                  <p className="text-[10px] text-neutral-400 leading-normal">
+                    Tell me what to change. E.g. &ldquo;Make my summary more impactful&rdquo; or &ldquo;Add Python to my skills&rdquo;.
+                  </p>
+                )}
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`text-[10px] leading-relaxed ${
+                    msg.role === "user"
+                      ? "text-neutral-900 font-semibold text-right"
+                      : "text-neutral-600 font-medium"
+                  }`}>
+                    {msg.role === "assistant" && <span className="text-neutral-400 mr-1">Arvo:</span>}
+                    {msg.text}
+                  </div>
+                ))}
+                {isChatLoading && (
+                  <div className="flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin text-neutral-400" />
+                    <span className="text-[10px] text-neutral-400">Thinking...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleChatSend()}
+                  placeholder="Ask Arvo to edit your CV..."
+                  className="flex-1 px-2.5 py-1.5 border border-neutral-200 rounded-[6px] text-xs bg-white focus:outline-none focus:border-neutral-400"
+                  disabled={isChatLoading}
+                />
+                <button
+                  onClick={handleChatSend}
+                  disabled={isChatLoading || !chatInput.trim()}
+                  className="p-1.5 bg-neutral-900 hover:bg-black text-white rounded-[6px] transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {previousContent && chatMessages.length > 0 && (
+                <button
+                  onClick={() => { setContent(previousContent); setPreviousContent(null); toast("Reverted last AI change", "info"); }}
+                  className="text-[10px] font-bold text-amber-600 hover:underline"
+                >
+                  ↩ Undo last change
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -1830,6 +2044,21 @@ export default function ResumeEditor() {
                       <option value="narrow">Narrow (10mm)</option>
                       <option value="standard">Standard (20mm)</option>
                       <option value="wide">Wide (30mm)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 text-xs mb-1">
+                  <div>
+                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest block mb-1">Font Size</label>
+                    <select
+                      value={fontSize}
+                      onChange={(e: any) => setFontSize(e.target.value)}
+                      className="w-full p-2 border border-neutral-200 rounded-[6px] bg-white text-xs"
+                    >
+                      <option value="small">Small</option>
+                      <option value="standard">Standard</option>
+                      <option value="large">Large</option>
                     </select>
                   </div>
                 </div>

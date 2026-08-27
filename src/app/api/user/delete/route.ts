@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
-import { getAuthUser, removeAuthCookie } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 export async function DELETE() {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Cascade deletes resumes & subscription via foreign key relation setup in Prisma
     await prisma.user.delete({
-      where: { id: authUser.userId },
+      where: { id: userId },
     });
 
     // Clear session cookies
-    await removeAuthCookie();
+    // Sign out handled by Clerk
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

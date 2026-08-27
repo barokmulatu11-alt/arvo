@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 import { generateAIContent } from "@/lib/ai";
 
 export async function POST(request: Request) {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     // Check user subscription limits
     const subscription = await prisma.subscription.findUnique({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
     });
 
     if (!subscription) {
@@ -52,7 +50,7 @@ Use strong action verbs (e.g., spearheaded, designed, optimized, spearheaded) an
 
     // Increment AI usage count
     await prisma.subscription.update({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
       data: {
         aiUsageCount: {
           increment: 1,

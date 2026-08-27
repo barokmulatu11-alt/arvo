@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { getAuthUser, setAuthCookie } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 export async function PUT(request: Request) {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { name, email } = await request.json();
 
@@ -22,28 +20,57 @@ export async function PUT(request: Request) {
       where: { email: emailLower },
     });
 
-    if (existing && existing.id !== authUser.userId) {
+    if (existing && existing.id !== userId) {
       return NextResponse.json({ error: "Email is already taken" }, { status: 400 });
     }
 
     const updated = await prisma.user.update({
-      where: { id: authUser.userId },
+      where: { id: userId },
       data: {
         name,
         email: emailLower,
       },
     });
 
-    // Re-issue cookie with new details
-    await setAuthCookie({
-      userId: updated.id,
-      email: updated.email,
-      name: updated.name,
-    });
-
     return NextResponse.json({ success: true, user: updated });
   } catch (error: any) {
     console.error("Profile update error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    let user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true }
+    });
+
+    // Auto-sync fallback if webhook failed
+    if (!user) {
+      const { clerkClient } = await import("@clerk/nextjs/server");
+      const clerk = await clerkClient();
+      const clerkUser = await clerk.users.getUser(userId);
+      
+      const email = clerkUser.emailAddresses[0]?.emailAddress || "";
+      const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "New User";
+
+      user = await prisma.user.create({
+        data: {
+          id: userId,
+          email,
+          name,
+        },
+        include: { subscription: true }
+      });
+    }
+
+    return NextResponse.json({ user });
+  } catch (error: any) {
+    console.error("Profile fetch error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

@@ -8,6 +8,7 @@ import {
   ChevronDown, Loader2, LayoutGrid, FileText, 
   Settings, CreditCard, Layers, Compass, LogOut
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface UserProfile {
   name: string;
@@ -108,10 +109,12 @@ export default function DashboardLayout({
       {/* Mobile Top Header */}
       <header className="md:hidden h-14 border-b border-neutral-100 px-4 flex items-center justify-between shrink-0 bg-white">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="font-extrabold text-xs tracking-widest text-neutral-900 uppercase">
+          <span className="font-extrabold text-xs tracking-widest text-foreground uppercase">
             Arvo
           </span>
         </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-1.5 rounded-[6px] hover:bg-neutral-50 border border-neutral-100 text-neutral-600"
@@ -121,17 +124,21 @@ export default function DashboardLayout({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
+        </div>
       </header>
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex w-56 border-r border-neutral-100 flex-col justify-between shrink-0 bg-white p-4">
         <div className="flex flex-col gap-6">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2 px-2">
-            <span className="font-extrabold text-xs tracking-widest text-neutral-900 uppercase">
-              Arvo
-            </span>
-          </Link>
+          <div className="flex items-center justify-between px-2">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <span className="font-extrabold text-xs tracking-widest text-foreground uppercase">
+                Arvo
+              </span>
+            </Link>
+            <ThemeToggle />
+          </div>
 
           {/* Nav list */}
           <nav className="flex flex-col gap-1">

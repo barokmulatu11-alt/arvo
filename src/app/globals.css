@@ -1,40 +1,67 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
+  /* Core Colors */
   --background: #ffffff;
-  --foreground: #111111;
-  
-  --primary: #111111;
-  --primary-hover: #000000;
-  --primary-light: #f4f4f5;
-  
-  --border: #e4e4e7;
-  --border-hover: #d4d4d8;
-  
   --surface: #fafafa;
-  --surface-elevated: #ffffff;
-  
+  --foreground: #111111;
   --muted: #71717a;
   --muted-foreground: #a1a1aa;
   
-  --success: #18181b;
-  --warning: #27272a;
-  --error: #7f1d1d;
+  --primary: #111111;
+  --primary-hover: #000000;
   
+  /* Accents */
+  --accent: #111111;
+  --on-accent: #ffffff;
+  
+  /* Borders */
+  --border: #e4e4e7;
+  --border-hover: #d4d4d8;
+  
+  /* Special Exception */
+  --document: #ffffff;
+  
+  /* Sharp Radii */
   --radius: 6px;
   --radius-sm: 4px;
   --radius-lg: 8px;
+}
+
+.dark {
+  /* Core Colors */
+  --background: #0A0A0B;
+  --surface: #141416;
+  --foreground: #EDEDEF;
+  --muted: #8B8B93;
+  --muted-foreground: #8B8B93;
+  
+  --primary: #C8FF4D;
+  --primary-hover: #b4e645;
+  
+  /* Accents */
+  --accent: #C8FF4D;
+  --on-accent: #1B2900;
+  
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  
+  /* Special Exception */
+  --document: #F5F3EC;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-border: var(--border);
   --color-surface: var(--surface);
   --color-muted: var(--muted);
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --color-document: var(--document);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -45,9 +72,54 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings typography adjustments */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Utility Classes */
+.btn-primary {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 10px rgba(200, 255, 77, 0.2);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-secondary:hover {
+  border-color: var(--border-hover);
+  color: var(--foreground);
+}
+
+.card-surface {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 
@@ -84,7 +156,8 @@ input, textarea, select {
 .page-a4 {
   width: 210mm;
   height: 297mm;
-  background: white;
+  background: var(--document);
+  color: #111111;
   border: 1px solid var(--border);
   position: relative;
   box-sizing: border-box;
@@ -93,7 +166,8 @@ input, textarea, select {
 .page-letter {
   width: 215.9mm;
   height: 279.4mm;
-  background: white;
+  background: var(--document);
+  color: #111111;
   border: 1px solid var(--border);
   position: relative;
   box-sizing: border-box;
@@ -136,8 +210,8 @@ input, textarea, select {
     height: auto !important;
     overflow: visible !important;
     position: relative !important;
-    background: white !important;
-    color: black !important;
+    background: var(--document) !important;
+    color: #111111 !important;
   }
   body * {
     visibility: hidden;
@@ -146,11 +220,14 @@ input, textarea, select {
     visibility: visible;
   }
   .print-area-wrapper {
-    position: relative !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     display: block !important;
+    transform: none !important;
   }
   .a4-page {
     border: none !important;
@@ -178,7 +255,7 @@ input, textarea, select {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
+  background: linear-gradient(90deg, #141416 25%, #1e1e20 50%, #141416 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: var(--radius);

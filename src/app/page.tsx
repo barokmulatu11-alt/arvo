@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
   return (
@@ -13,18 +14,24 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-6">
-          <Link
-            href="/login"
-            className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/signup"
-            className="text-xs font-semibold text-white bg-neutral-900 hover:bg-black px-3 py-1.5 rounded-[4px] transition-colors"
-          >
-            Get Started
-          </Link>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors">
+                Sign In
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="text-xs font-semibold text-white bg-neutral-900 hover:bg-black px-3 py-1.5 rounded-[4px] transition-colors">
+                Get Started
+              </button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <Link href="/dashboard" className="text-xs font-medium text-neutral-500 hover:text-neutral-900 transition-colors">
+              Dashboard
+            </Link>
+            <UserButton />
+          </Show>
         </div>
       </header>
 
@@ -44,19 +51,23 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
-            <Link
-              href="/signup"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-neutral-900 hover:bg-black px-6 py-3 rounded-[6px] transition-colors"
-            >
-              Create Resume Free
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-            <Link
-              href="/login"
-              className="w-full sm:w-auto inline-flex items-center justify-center text-xs font-bold text-neutral-700 bg-white hover:bg-neutral-50 border border-neutral-200 px-6 py-3 rounded-[6px] transition-colors"
-            >
-              Dashboard
-            </Link>
+            <Show when="signed-out">
+              <SignUpButton mode="modal">
+                <button className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-neutral-900 hover:bg-black px-6 py-3 rounded-[6px] transition-colors">
+                  Create Resume Free
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <Link
+                href="/dashboard"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-neutral-900 hover:bg-black px-6 py-3 rounded-[6px] transition-colors"
+              >
+                Go to Dashboard
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </Show>
           </div>
         </div>
       </main>

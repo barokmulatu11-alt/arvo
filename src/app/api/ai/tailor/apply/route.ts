@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth";
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const authUser = await getAuthUser();
-    if (!authUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { resumeId, tailoredSummary } = await request.json();
 
@@ -24,13 +22,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Resume not found" }, { status: 404 });
     }
 
-    if (sourceResume.userId !== authUser.userId) {
+    if (sourceResume.userId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Check user subscription limits for another active layout
     const user = await prisma.user.findUnique({
-      where: { id: authUser.userId },
+      where: { id: userId },
       include: { subscription: true },
     });
 
@@ -39,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const resumeCount = await prisma.resume.count({
-      where: { userId: authUser.userId },
+      where: { userId: userId },
     });
 
     const isPro = user.subscription?.plan === "PRO";
@@ -60,7 +58,7 @@ export async function POST(request: Request) {
     // Create tailored clone
     const tailoredResume = await prisma.resume.create({
       data: {
-        userId: authUser.userId,
+        userId: userId,
         title: `[Tailored] ${sourceResume.title}`,
         templateId: sourceResume.templateId,
         content: JSON.stringify(content),

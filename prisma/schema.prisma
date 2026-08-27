@@ -12,11 +12,9 @@ model User {
   id                  String               @id @default(uuid())
   name                String
   email               String               @unique
-  passwordHash        String
   createdAt           DateTime             @default(now())
   resumes             Resume[]
   subscription        Subscription?
-  passwordResetTokens PasswordResetToken[]
   paymentRequests     PaymentRequest[]
 }
 
@@ -55,11 +53,3 @@ model Subscription {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model PasswordResetToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
